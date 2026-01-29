@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root { --card-red: #d32f2f; --felt: #0b4b1e; --gold: #fbc02d; --win: #2e7d32; --lose: #c62828; }
+    body { font-family: 'Segoe UI', sans-serif; background: var(--felt); color: white; margin: 0; padding: 10px; display: flex; flex-direction: column; height: 100vh; text-align: center; overflow: hidden; }
+    
+    .top-info { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 12px; }
+    .scoreboard { display: flex; gap: 15px; background: #000; padding: 8px 15px; border-radius: 8px; color: #0f0; font-weight: bold; }
+    .btn-reset { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: #aaa; padding: 4px 10px; border-radius: 4px; font-size: 10px; cursor: pointer; margin-top: 5px; }
+    
+    #resultBanner { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); background: rgba(0,0,0,0.95); width: 100%; padding: 40px 0; z-index: 2000; border-top: 4px solid var(--gold); transition: 0.4s; pointer-events: none; }
+    #resultBanner.show { transform: translate(-50%, -50%) scale(1); pointer-events: all; }
+
+    .game-area { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; overflow: hidden; }
+    .cards-row { display: flex; justify-content: center; gap: 10px; width: 100%; overflow-x: auto; padding: 10px 0; min-height: 140px; }
+
+    .card { flex: 0 0 auto; background: #fff; width: 85px; height: 125px; border-radius: 8px; position: relative; color: #000; box-shadow: 3px 3px 8px rgba(0,0,0,0.4); display: flex; flex-direction: column; transition: opacity 0.2s; }
+    .card.playable { cursor: pointer; }
+    .card.playable:hover { transform: translateY(-5px); border: 2px solid var(--gold); }
+    .card.red { color: var(--card-red); }
+    
+    .card-corner { position: absolute; padding: 4px; line-height: 0.8; font-weight: bold; font-size: 14px; text-align: center; }
+    .corner-top { top: 2px; left: 2px; }
+    .corner-bottom { bottom: 2px; right: 2px; transform: rotate(180deg); }
+
+    .card-center { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 10px; box-sizing: border-box; }
+    .card-center.grid-layout { display: grid; width: 100%; height: 100%; }
+
+    .grid-2 { grid-template-rows: 1fr 1fr; }
+    .grid-3 { grid-template-rows: 1fr 1fr 1fr; }
+    .grid-4, .grid-6 { grid-template-columns: 1fr 1fr; }
+    .grid-5, .grid-7 { grid-template-columns: 1fr 1fr; position: relative; }
+    .center-suit { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+
+    .figura { font-size: 3.5em; display: flex; align-items: center; justify-content: center; height: 100%; width: 100%; line-height: 1; }
+
+    .visual-history { background: rgba(0,0,0,0.4); border-radius: 8px; height: 100px; overflow-y: auto; padding: 8px; }
+    .hist-row { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 5px; }
+    .mini-card { background: #fff; color: #000; width: 30px; height: 40px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.7em; font-weight: bold; }
+    .mini-card.back { background: #1a2a3a; color: #fff; border: 1px solid var(--gold); }
+    .winner-indicator { font-size: 1.1em; min-width: 25px; font-weight: bold; }
+    .win-j1 { color: #4caf50; } .win-j2 { color: #2196f3; } .win-draw { color: var(--gold); }
+
+    .btn-truco { background: linear-gradient(#fbc02d, #f9a825); color: #000; border: none; padding: 12px 35px; border-radius: 25px; font-weight: 900; cursor: pointer; box-shadow: 0 4px #c49000; }
+    .btn-deal { background: var(--gold); color: #000; padding: 15px 40px; border-radius: 30px; font-weight: 900; border: none; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <div id="resultBanner">
+    <h1 id="resultText">VITÓRIA!</h1>
+    <button onclick="limparMesa()" style="padding:12px 25px; border-radius:20px; font-weight:bold; cursor:pointer; background:white; border:none;">RECOLHER CARTAS</button>
+  </div>
+
+  <div class="top-info">
+    <div>
+      <select id="playerSel" onchange="carregarJogo()"><option value="1">JOGADOR 1</option><option value="2">JOGADOR 2</option></select>
+      <div class="scoreboard">J1: <span id="p1">0</span> | J2: <span id="p2">0</span></div>
+      <button class="btn-reset" onclick="if(confirm('Zerar placar geral?')) google.script.run.withSuccessHandler(carregarJogo).zerarTudo()">RESETAR PLACAR</button>
+    </div>
+    <div class="game-value-box">
+      <span style="font-size:10px; color:var(--gold)">VALE</span>
+      <div id="labelValor" style="font-size:2em; font-weight:900;">1</div>
+    </div>
+  </div>
+
+  <div class="game-area">
+    <div id="statusMesa">
+      <button id="btnDarCartas" class="btn-deal" onclick="darCartas()" style="display:none;">DAR CARTAS 🃏</button>
+      <div id="vezDisplay" style="color:var(--gold); font-weight:bold; padding: 10px 0;">AGUARDANDO...</div>
+    </div>
+    
+    <div class="cards-row" id="mao"></div>
+
+    <div id="controlesJogo">
+      <button class="btn-truco" onclick="gritarTruco()">TRUCO!</button>
+      <label style="display:block; margin-top:10px; font-size:0.85em; cursor:pointer;"><input type="checkbox" id="checkEsconder"> Jogar Fechada 🙈</label>
+    </div>
+
+    <div style="display:grid; grid-template-columns: 1fr 100px; gap:10px; padding-top: 10px;">
+      <div class="visual-history" id="visualHistory"></div>
+      <div style="border:1.5px solid var(--gold); border-radius:10px; padding:5px; background:rgba(0,0,0,0.2); display:flex; flex-direction:column; align-items:center;">
+        <div style="font-size:10px; color:var(--gold); font-weight:bold; margin-bottom:5px;">VIRA</div>
+        <div id="viraCardSlot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="desafioOverlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); display:none; flex-direction:column; justify-content:center; align-items:center; z-index:5000;">
+    <div style="background:#fff; color:#000; padding:30px; border-radius:20px; text-align:center; border: 5px solid var(--gold);">
+      <h2 id="desafioTexto" style="font-size:2.2em; margin:0; color:#d32f2f;">TRUCO!</h2>
+      <p id="quemPediu" style="font-weight:bold; margin: 10px 0;"></p>
+      <div style="margin-top:20px;">
+        <button onclick="responderDesafio('aceito')" style="background:var(--win); color:#fff; padding:15px 25px; border:none; border-radius:8px; margin:5px; font-weight:bold; cursor:pointer;">ACEITAR</button>
+        <button onclick="responderDesafio('correr')" style="background:var(--lose); color:#fff; padding:15px 25px; border:none; border-radius:8px; margin:5px; font-weight:bold; cursor:pointer;">CORRER</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let finalizadoLocal = false;
+    let ultimaMesa = "";
+
+    function carregarJogo() {
+      const pNum = document.getElementById("playerSel").value;
+      google.script.run.withSuccessHandler(data => {
+        if (!data) return;
+        
+        document.getElementById("btnDarCartas").style.display = data.pronto ? "none" : "inline-block";
+        document.getElementById("vezDisplay").style.display = data.pronto ? "block" : "none";
+        document.getElementById("controlesJogo").style.display = data.pronto ? "block" : "none";
+
+        if (data.finalizado && !finalizadoLocal) exibirResultado(data);
+        else if (!data.finalizado) {
+          finalizadoLocal = false;
+          document.getElementById("resultBanner").classList.remove("show");
+          document.getElementById("p1").innerText = data.placar.j1;
+          document.getElementById("p2").innerText = data.placar.j2;
+        }
+
+        document.getElementById("labelValor").innerText = data.valor;
+        document.getElementById("viraCardSlot").innerHTML = renderCardHTML(data.vira, false, false, true); 
+        
+        const minhaVez = data.vezDe === "Jogador " + pNum;
+        
+        // Renderiza apenas se houver mudança
+        const mesaHash = data.vezDe + data.cartas.join("");
+        if(ultimaMesa !== mesaHash){
+           document.getElementById("vezDisplay").innerText = minhaVez ? "SUA VEZ!" : (data.vezDe === "FIM" ? "MÃO FINALIZADA" : "OPONENTE JOGANDO...");
+           const container = document.getElementById("mao");
+           container.innerHTML = "";
+           if(data.pronto && !data.finalizado) {
+             data.cartas.forEach(c => container.innerHTML += renderCardHTML(c, minhaVez, true));
+           }
+           ultimaMesa = mesaHash;
+        }
+
+        const overlay = document.getElementById("desafioOverlay");
+        if (data.desafio !== "Nenhum" && !data.desafio.includes("Jogador " + pNum)) {
+          overlay.style.display = "flex"; 
+          document.getElementById("quemPediu").innerText = data.desafio;
+        } else overlay.style.display = "none";
+
+        renderHistorial(data.historico, data.rodadas);
+      }).getDadosIniciais(pNum);
+    }
+
+    function renderCardHTML(c, isV, play = true, isMini = false) {
+      if(!c) return "";
+      if(c.includes("🙈") || c.includes("VIRADA")) {
+        return `<div class="card" style="justify-content:center;align-items:center;background:#1a2a3a;color:white;${isMini?'width:50px;height:70px;font-size:1em;':'font-size:2.5em;'}">🎴</div>`;
+      }
+      const [v, s] = c.split(" ");
+      const isRed = (s === '♥' || s === '♦');
+      let centerContent = "";
+      let centerClass = "card-center";
+
+      if (['J','Q','K'].includes(v)) {
+        centerContent = `<div class="figura">${v === 'J' ? '⚔️' : v === 'Q' ? '👸' : '🤴'}</div>`;
+      } else if (v === 'A') {
+        centerContent = `<div class="figura" style="font-size:3.5em">${s}</div>`;
+      } else {
+        centerClass += " grid-layout grid-" + v;
+        if (v === '2') centerContent = `<div>${s}</div><div>${s}</div>`;
+        else if (v === '3') centerContent = `<div>${s}</div><div>${s}</div><div>${s}</div>`;
+        else if (v === '4') centerContent = `<div>${s}</div><div>${s}</div><div>${s}</div><div>${s}</div>`;
+        else if (v === '5') centerContent = `<div>${s}</div><div>${s}</div><div>${s}</div><div>${s}</div><div class="center-suit">${s}</div>`;
+        else if (v === '6') centerContent = `<div>${s}</div><div>${s}</div><div>${s}</div><div>${s}</div><div>${s}</div><div>${s}</div>`;
+        else if (v === '7') centerContent = `<div>${s}</div><div>${s}</div><div>${s}</div><div>${s}</div><div>${s}</div><div>${s}</div><div class="center-suit">${s}</div>`;
+      }
+
+      let style = isMini ? 'width:50px;height:70px;font-size:0.6em;' : '';
+      return `<div class="card ${isRed?'red':''} ${play&&isV?'playable':''}" style="${style}" ${play&&isV?`onclick="jogar('${c}', this)"`:''}>
+        <div class="card-corner corner-top"><div>${v}</div><div>${s}</div></div>
+        <div class="${centerClass}">${centerContent}</div>
+        <div class="card-corner corner-bottom"><div>${v}</div><div>${s}</div></div>
+      </div>`;
+    }
+
+    function renderHistorial(h, rodadas) {
+      const container = document.getElementById("visualHistory"); 
+      if(!h) return;
+      let htmlH = "";
+      for (let i = 0; i < h.length; i += 2) {
+        const venceu = rodadas ? rodadas[i/2] : null;
+        let icon = "⚔️", cl = "";
+        if(venceu === "Jogador 1") { icon = "⬅️"; cl = "win-j1"; }
+        else if(venceu === "Jogador 2") { icon = "➡️"; cl = "win-j2"; }
+        else if(venceu === "Empate") { icon = "🤝"; cl = "win-draw"; }
+        htmlH += `<div class="hist-row">
+          <div class="mini-card ${h[i][2].includes('🙈')?'back':''}">${h[i][2].includes('🙈')?'🎴':h[i][2].replace(' ','')}</div>
+          <div class="winner-indicator ${cl}">${icon}</div>
+          <div class="mini-card ${h[i+1] && h[i+1][2].includes('🙈')?'back':''}">${h[i+1] ? (h[i+1][2].includes('🙈')?'🎴':h[i+1][2].replace(' ','')) : '?'}</div>
+        </div>`;
+      }
+      container.innerHTML = htmlH;
+    }
+
+    function jogar(c, el) { 
+      if(el) el.style.opacity = "0"; // Interface otimista
+      google.script.run.withSuccessHandler(carregarJogo).jogarCarta(document.getElementById("playerSel").value, c, document.getElementById("checkEsconder").checked); 
+    }
+    function gritarTruco() { google.script.run.withSuccessHandler(carregarJogo).pedirAumento(document.getElementById("playerSel").value); }
+    function responderDesafio(r) { 
+      document.getElementById("desafioOverlay").style.display = "none";
+      google.script.run.withSuccessHandler(carregarJogo).responderDesafio(document.getElementById("playerSel").value, r); 
+    }
+    function exibirResultado(data) {
+      finalizadoLocal = true;
+      const t = document.getElementById("resultText");
+      const venceu = data.vencedorMao === "Jogador " + document.getElementById("playerSel").value;
+      t.innerText = venceu ? "VITÓRIA! 🏆" : "DERROTA! ❌";
+      t.style.color = venceu ? "var(--win)" : "var(--lose)";
+      document.getElementById("resultBanner").classList.add("show");
+    }
+    function darCartas() { google.script.run.withSuccessHandler(carregarJogo).distribuirCartas(); }
+    function limparMesa() { google.script.run.withSuccessHandler(carregarJogo).prepararNovaMao(); }
+
+    setInterval(carregarJogo, 1200);
+    window.onload = carregarJogo;
+  </script>
+</body>
+</html>
